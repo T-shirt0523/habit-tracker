@@ -1,0 +1,10 @@
+# 二进制与本地构建产物不入库
+*.apk
+*.keystore
+build/
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
