@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<!--
+  自律打卡 (Habit Tracker) - 单文件习惯打卡应用
+  Copyright (c) 2026 ts
+  以 MIT 许可证开源，完整许可文本见项目根目录 LICENSE 文件。
+  本项目不包含任何第三方作品素材，全部图形为原创 SVG。
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#FFFFFF">
+<title>自律打卡</title>
+<style>
+/* ============================================================
+   设计令牌 —— 严格取自设计稿
+   ============================================================ */
+:root{
+  --blue:#0064E0;          /* 钴蓝 · 产品内唯一主行动色 */
+  --blue-soft:#0091FF;     /* 高亮蓝 · 图表选中 */
+  --ink:#0A1317;           /* 墨黑 · 英雄卡 / 主 CTA 底色 */
+  --ink-2:#1C1E21;         /* 区块标题 */
+  --ink-3:#444950;         /* 字段标签 / 次级文字 */
+  --gray-1:#5D6C7B;
+  --gray-2:#8595A4;        /* 说明文字 / 未激活图标 */
+  --gray-3:#BCC0C4;        /* 置灰日期 */
+  --line:#DEE3E9;          /* 卡片描边 / 分割线 */
+  --line-2:#CED0D4;        /* 待打卡圆环 */
+  --soft:#F1F4F7;          /* 浅灰填充 */
+  --soft-blue:#E7F0FF;
+  --soft-green:#E6F6EA;
+  --soft-amber:#FFF6E5;
+  --white:#FFFFFF;
+  --yellow:#F7B928;        /* 连续打卡徽章 */
+  --green:#31A24C;
+  --amber:#F2A918;
+
+  --r-32:32px; --r-24:24px; --r-20:20px; --r-18:18px; --r-16:16px; --r-14:14px; --r-12:12px;
+  --pill:100px;
+
+  --font: "Noto Sans SC","Noto Sans CJK SC","Source Han Sans SC","PingFang SC","HarmonyOS Sans SC","Microsoft YaHei",-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-num: Inter,"Noto Sans SC","PingFang SC","Microsoft YaHei",-apple-system,sans-serif;
+}
+
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:#E7EBEF}
+body{
+  font-family:var(--font);
+  display:flex;align-items:center;justify-content:center;
+  overscroll-behavior:none;
+  color:var(--ink);
+  -webkit-font-smoothing:antialiased;
+}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+svg{display:block}
+.hide{display:none!important}
+
+/* ============================================================
+   舞台：390×844 设计画布，等比铺满视口
+   ============================================================ */
+#phone{
+  position:relative;
+  width:390px;height:844px;
+  background:var(--white);
+  display:flex;flex-direction:column;
+  overflow:hidden;
+  transform-origin:center center;
+}
+@media (min-width:900px) and (min-height:1000px){
+  #phone{box-shadow:0 24px 64px rgba(10,19,23,.18),0 0 0 1px rgba(10,19,23,.06);border-radius:40px}
+}
+
+/* ============================================================
+   状态栏 62px
+   ============================================================ */
+.statusbar{
+  flex:none;height:62px;background:var(--white);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 24px;
+}
+.statusbar .clock{
+  font-family:var(--font-num);font-size:15px;font-weight:600;color:var(--ink);
+  letter-spacing:.2px;
+}
+.statusbar .sysicons{display:flex;align-items:center;gap:5px}
+
+/* ============================================================
+   视图容器
+   ============================================================ */
+.view{flex:1;min-height:0;display:flex;flex-direction:column}
+.content{
+  flex:1;min-height:0;overflow-y:auto;
+  padding:16px 20px;
+  display:flex;flex-direction:column;gap:20px;
+  scrollbar-width:none;
+}
+.content::-webkit-scrollbar{display:none}
+.content.gap22{gap:22px}
+
+/* ============================================================
+   页头
+   ============================================================ */
+.pagehead{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.pagehead .titles{display:flex;flex-direction:column;gap:2px;min-width:0}
+.pagehead .h1{font-size:24px;font-weight:600;color:var(--ink);line-height:1.25}
+.pagehead .sub{font-size:13px;font-weight:400;color:var(--gray-2);line-height:1.35}
+.iconbtn{
+  flex:none;width:40px;height:40px;border-radius:var(--pill);background:var(--soft);
+  display:flex;align-items:center;justify-content:center;
+  transition:background .15s;
+}
+.iconbtn:active{background:#E4E9EF}
+.textbtn{font-size:15px;font-weight:500;color:var(--blue);padding:6px 2px}
+.linkbtn{font-size:13px;font-weight:600;color:var(--blue);flex:none}
+
+/* ============================================================
+   今日进度卡
+   ============================================================ */
+.hero{
+  background:var(--ink);border-radius:var(--r-32);
+  padding:24px;display:flex;flex-direction:column;gap:16px;
+  flex:none;
+}
+.hero-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.hero-label{font-size:14px;color:rgba(255,255,255,.66)}
+.streak{
+  display:flex;align-items:center;gap:5px;
+  background:var(--yellow);border-radius:var(--pill);
+  padding:5px 10px;flex:none;
+}
+.streak span{font-size:12px;font-weight:700;color:var(--ink)}
+.hero-num{display:flex;align-items:flex-end;gap:6px}
+.hero-num .big{font-size:46px;font-weight:700;color:#fff;line-height:50px;letter-spacing:-.5px}
+.hero-num .of{font-size:15px;font-weight:500;line-height:24px;color:rgba(255,255,255,.5);padding-bottom:2px}
+.track{height:8px;border-radius:var(--pill);overflow:hidden;background:rgba(255,255,255,.14)}
+.track .fill{height:8px;border-radius:var(--pill);background:var(--blue);transition:width .45s cubic-bezier(.4,0,.2,1)}
+.hero-foot{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.hero-foot .hint{font-size:12px;color:rgba(255,255,255,.5)}
+.hero-foot .pct{font-size:12px;font-weight:700;color:#fff}
+
+/* ============================================================
+   区块 / 列表行
+   ============================================================ */
+.section{display:flex;flex-direction:column;gap:14px;flex:none}
+.sec-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.sec-title{font-size:18px;font-weight:600;color:var(--ink-2)}
+.list{display:flex;flex-direction:column;gap:12px}
+.list.gap10{gap:10px}
+
+.habit{
+  display:flex;align-items:center;gap:12px;
+  padding:14px;border-radius:var(--r-20);
+  background:#fff;border:1px solid var(--line);
+  transition:border-color .18s,background .18s;
+}
+.habit:active{border-color:#C9D2DC}
+.habit .hicon{
+  flex:none;width:44px;height:44px;border-radius:var(--r-14);
+  display:flex;align-items:center;justify-content:center;
+}
+.habit .hmeta{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.habit .hname{font-size:16px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.habit .hdesc{font-size:12px;color:var(--gray-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.check{
+  flex:none;width:28px;height:28px;border-radius:var(--pill);
+  display:flex;align-items:center;justify-content:center;
+  background:#fff;box-shadow:inset 0 0 0 2px var(--line-2);
+  transition:background .2s,box-shadow .2s,transform .12s;
+}
+.check svg{opacity:0;transform:scale(.6);transition:opacity .18s,transform .22s cubic-bezier(.34,1.56,.64,1)}
+.check.on{background:var(--blue);box-shadow:inset 0 0 0 2px var(--blue)}
+.check.on svg{opacity:1;transform:scale(1)}
+.check:active{transform:scale(.9)}
+
+/* ============================================================
+   Tab Bar
+   ============================================================ */
+.tabbar{flex:none;padding:12px 21px 21px;display:flex}
+.tabpill{
+  flex:1;height:62px;border-radius:36px;background:#fff;
+  box-shadow:inset 0 0 0 1px var(--line);
+  padding:4px;display:flex;
+}
+.tab{
+  flex:1;border-radius:26px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  transition:background .22s;
+}
+.tab .tlabel{font-size:10px;font-weight:500;color:var(--gray-2);transition:color .22s}
+.tab svg [stroke]{transition:stroke .22s}
+.tab.on{background:var(--blue)}
+.tab.on .tlabel{color:#fff}
+
+/* ============================================================
+   日历
+   ============================================================ */
+.calcard{
+  background:#fff;border:1px solid var(--line);border-radius:var(--r-24);
+  padding:24px;display:flex;flex-direction:column;gap:16px;flex:none;
+}
+.calhead{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.calhead .month{font-size:17px;font-weight:600;color:var(--ink)}
+.chip-sm{
+  display:flex;align-items:center;padding:5px 12px;border-radius:var(--pill);
+  background:#fff;box-shadow:inset 0 0 0 1px var(--line);
+  font-size:12px;font-weight:600;color:var(--gray-1);
+}
+.weekrow{display:grid;grid-template-columns:repeat(7,38px);gap:8px 6px;width:302px}
+.weekrow span{font-size:12px;color:var(--gray-2);text-align:center;line-height:16px}
+.calgrid{display:grid;grid-template-columns:repeat(7,38px);gap:8px 6px;width:302px;touch-action:pan-y}
+.day{
+  width:38px;height:38px;border-radius:var(--r-12);
+  display:flex;align-items:center;justify-content:center;
+  font-size:13px;font-weight:400;color:var(--gray-3);
+  transition:background .2s,color .2s;
+}
+.day.done{background:var(--blue);color:#fff;font-weight:600}
+.day.miss{background:var(--soft);color:var(--gray-2)}
+.day.today{background:var(--ink);color:#fff;font-weight:700}
+.day.other{color:var(--gray-3)}
+
+/* ============================================================
+   统计
+   ============================================================ */
+.chip{
+  display:flex;align-items:center;gap:4px;padding:7px 10px 7px 12px;border-radius:var(--pill);
+  background:var(--soft);flex:none;
+}
+.chip span{font-size:12px;font-weight:600;color:var(--ink-2)}
+.chart{display:flex;flex-direction:column;gap:0}
+.chart-bars{height:104px;display:flex;gap:20px;align-items:flex-end}
+.chart-bars .bar{width:26px;border-radius:13px;background:rgba(255,255,255,.22);transition:height .5s cubic-bezier(.4,0,.2,1)}
+.chart-bars .bar.peak{background:var(--blue-soft)}
+.chart-labels{display:flex;gap:20px;height:16px}
+.chart-labels span{width:26px;text-align:center;font-size:10px;font-weight:500;color:rgba(255,255,255,.45);line-height:16px}
+
+.rank{
+  display:flex;align-items:center;gap:12px;padding:12px;
+  border-radius:var(--r-18);background:var(--soft);
+}
+.rank .no{font-size:15px;font-weight:700;color:var(--blue);flex:none}
+.rank .rmain{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
+.rank .rname{font-size:15px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rank .rtrack{height:6px;border-radius:var(--pill);background:var(--line);overflow:hidden}
+.rank .rtrack i{display:block;height:6px;border-radius:var(--pill);background:var(--blue);transition:width .45s cubic-bezier(.4,0,.2,1)}
+.rank .days{font-size:13px;font-weight:500;color:var(--ink-3);flex:none}
+
+/* ============================================================
+   新建习惯表单
+   ============================================================ */
+.field{display:flex;flex-direction:column;gap:10px;flex:none}
+.flabel{font-size:13px;font-weight:600;color:var(--ink-3)}
+.input{
+  height:54px;border-radius:var(--r-16);background:var(--soft);
+  padding:0 16px;border:0;width:100%;
+  font-family:var(--font);font-size:15px;color:var(--ink);
+  outline:none;transition:box-shadow .18s;
+}
+.input::placeholder{color:var(--gray-2)}
+.input:focus{box-shadow:inset 0 0 0 2px var(--blue)}
+.iconrow{display:flex;gap:12px}
+.iopts{
+  width:56px;height:56px;border-radius:var(--r-18);background:var(--soft);
+  display:flex;align-items:center;justify-content:center;flex:none;
+  transition:background .2s,box-shadow .2s,transform .12s;
+}
+.iopts:active{transform:scale(.94)}
+.iopts.on{background:var(--soft-blue);box-shadow:inset 0 0 0 2px var(--blue)}
+.pills{display:flex;gap:8px;flex-wrap:wrap}
+.pill{
+  padding:9px 16px;border-radius:var(--pill);background:var(--soft);
+  font-size:13px;font-weight:600;color:var(--ink-3);
+  transition:background .2s,color .2s;
+}
+.pill.on{background:var(--ink);color:#fff}
+.rowcard{
+  height:54px;border-radius:var(--r-16);background:var(--soft);
+  padding:0 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;
+  width:100%;
+}
+.rowcard .left{display:flex;align-items:center;gap:8px;min-width:0}
+.rowcard .val{font-size:16px;font-weight:600;color:var(--ink)}
+.rowcard .act{font-size:14px;font-weight:500;color:var(--blue);flex:none}
+.stepper{
+  width:28px;height:28px;border-radius:var(--pill);background:#fff;flex:none;
+  display:flex;align-items:center;justify-content:center;
+  transition:transform .1s,background .2s;
+}
+.stepper:active{transform:scale(.9)}
+.stepper.primary{background:var(--blue)}
+.stepper[disabled]{opacity:.4}
+
+.actionbar{
+  flex:none;padding:12px 20px 20px;display:flex;flex-direction:column;
+  align-items:center;gap:16px;background:#fff;
+}
+.btn-primary{
+  width:100%;height:54px;border-radius:var(--pill);background:var(--blue);
+  display:flex;align-items:center;justify-content:center;
+  font-size:15px;font-weight:700;color:#fff;
+  transition:transform .12s,opacity .2s;
+}
+.btn-primary:active{transform:scale(.985)}
+.btn-primary[disabled]{opacity:.45}
+.homebar{width:134px;height:5px;border-radius:var(--pill);background:var(--ink)}
+
+/* ============================================================
+   我的
+   ============================================================ */
+.ucard{
+  background:var(--ink);border-radius:var(--r-32);padding:24px;
+  display:flex;flex-direction:column;gap:20px;flex:none;
+}
+.urow{display:flex;align-items:center;gap:14px}
+.avatar{
+  width:56px;height:56px;border-radius:var(--pill);background:var(--blue);flex:none;
+  display:flex;align-items:center;justify-content:center;
+}
+.urow .umeta{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.uname{font-size:20px;font-weight:600;color:#fff}
+.usub{font-size:12px;color:rgba(255,255,255,.6)}
+.ustats{display:flex}
+.ustat{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}
+.ustat .n{font-size:22px;font-weight:700;color:#fff}
+.ustat .l{font-size:12px;color:rgba(255,255,255,.55)}
+.badges{display:flex;gap:8px}
+.badge{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;min-width:0}
+.badge .ring{
+  width:60px;height:60px;border-radius:var(--pill);
+  display:flex;align-items:center;justify-content:center;
+}
+.badge .bl{font-size:11px;font-weight:500;color:var(--ink-2);white-space:nowrap}
+.badge.locked .bl{color:var(--gray-2)}
+.setcard{
+  background:#fff;border:1px solid var(--line);border-radius:var(--r-24);
+  padding:8px 16px;display:flex;flex-direction:column;flex:none;
+}
+.setrow{
+  height:52px;display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;
+}
+.setrow .sn{font-size:15px;font-weight:500;color:var(--ink-2)}
+.divider{height:1px;background:var(--line);flex:none}
+
+/* ============================================================
+   弹层 / 提示
+   ============================================================ */
+.scrim{
+  position:absolute;inset:0;background:rgba(10,19,23,.42);
+  opacity:0;transition:opacity .26s;z-index:20;
+}
+.scrim.show{opacity:1}
+.sheet{
+  position:absolute;left:0;right:0;bottom:0;z-index:21;
+  background:#fff;border-radius:28px 28px 0 0;
+  padding:10px 20px 26px;
+  display:flex;flex-direction:column;gap:16px;
+  transform:translateY(102%);transition:transform .32s cubic-bezier(.32,.72,0,1);
+  max-height:70%;overflow:hidden;
+}
+.sheet.show{transform:translateY(0)}
+.sheet .handle{width:40px;height:4px;border-radius:var(--pill);background:var(--line);margin:0 auto;flex:none}
+.sheet .st{font-size:18px;font-weight:600;color:var(--ink-2);flex:none}
+.sheet .sbody{overflow-y:auto;display:flex;flex-direction:column;gap:10px;scrollbar-width:none}
+.sheet .sbody::-webkit-scrollbar{display:none}
+.srow{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:14px;border-radius:var(--r-18);background:var(--soft);flex:none;
+}
+.srow .sl{display:flex;flex-direction:column;gap:3px;min-width:0}
+.srow .sl b{font-size:15px;font-weight:600;color:var(--ink)}
+.srow .sl i{font-size:12px;font-style:normal;color:var(--gray-2)}
+.toast{
+  position:absolute;left:50%;bottom:120px;transform:translate(-50%,10px);
+  background:rgba(10,19,23,.92);color:#fff;font-size:13px;font-weight:500;
+  padding:10px 18px;border-radius:var(--pill);z-index:30;
+  opacity:0;pointer-events:none;transition:opacity .22s,transform .22s;
+  max-width:300px;text-align:center;
+}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+</style>
+</head>
+<body>
+<div id="phone">
+
+  <!-- ================= 状态栏 ================= -->
+  <header class="statusbar">
+    <div class="clock" id="clock">9:41</div>
+    <div class="sysicons">
+      <svg width="17" height="11" viewBox="0 0 17 11" fill="none"><rect x="0" y="7" width="3" height="4" rx="1" fill="#0A1317"/><rect x="4.7" y="5" width="3" height="6" rx="1" fill="#0A1317"/><rect x="9.4" y="2.6" width="3" height="8.4" rx="1" fill="#0A1317"/><rect x="14" y="0" width="3" height="11" rx="1" fill="#0A1317"/></svg>
+      <svg width="16" height="11" viewBox="0 0 16 11" fill="none"><path d="M8 10.4l1.9-2.2a2.8 2.8 0 00-3.8 0L8 10.4z" fill="#0A1317"/><path d="M4.1 5.7a6.1 6.1 0 017.8 0" stroke="#0A1317" stroke-width="1.6" stroke-linecap="round"/><path d="M1.5 2.8a9.9 9.9 0 0113 0" stroke="#0A1317" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <svg width="25" height="12" viewBox="0 0 25 12" fill="none"><rect x="0.6" y="0.6" width="20.8" height="10.8" rx="3.4" stroke="#0A1317" stroke-opacity="0.4" stroke-width="1.2"/><rect x="2.6" y="2.6" width="14" height="6.8" rx="2" fill="#0A1317"/><path d="M23.2 4.2v3.6a2.1 2.1 0 000-3.6z" fill="#0A1317" fill-opacity="0.4"/></svg>
+    </div>
+  </header>
+
+  <!-- ================= 四个 Tab 页 ================= -->
+  <main class="view" id="viewTab">
+    <div class="content" id="content"></div>
+    <nav class="tabbar">
+      <div class="tabpill" id="tabpill"></div>
+    </nav>
+  </main>
+
+  <!-- ================= 新建习惯 ================= -->
+  <main class="view hide" id="viewNew">
+    <div class="content gap22" id="newContent"></div>
+    <div class="actionbar">
+      <button class="btn-primary" id="btnCreate">创建习惯</button>
+      <div class="homebar"></div>
+    </div>
+  </main>
+
+  <!-- ================= 弹层 ================= -->
+  <div class="scrim" id="scrim"></div>
+  <div class="sheet" id="sheet">
+    <div class="handle"></div>
+    <div class="st" id="sheetTitle"></div>
+    <div class="sbody" id="sheetBody"></div>
+  </div>
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+"use strict";
+
+/* ============================================================
+   1. 图标库 —— 几何严格取自设计稿
+   ============================================================ */
+const HABIT_ICONS = {
+  book:{tint:'blue',svg:'<svg width="44" height="44" viewBox="0 0 44 44" fill="none"><path d="M21 19.4c-2.3-1.9-5.5-2.5-8.4-2.5v11.6c2.9 0 6.1.6 8.4 2.5V19.4z" fill="#0064E0"/><path d="M23 19.4c2.3-1.9 5.5-2.5 8.4-2.5v11.6c-2.9 0-6.1.6-8.4 2.5V19.4z" fill="#0064E0" fill-opacity="0.42"/></svg>'},
+  gym:{tint:'green',svg:'<svg width="44" height="44" viewBox="0 0 44 44" fill="none"><path d="M14.5 18.6v6.8M18.4 16.2v11.6M25.6 16.2v11.6M29.5 18.6v6.8M18.4 22h7.2" stroke="#31A24C" stroke-width="2.4" stroke-linecap="round"/></svg>'},
+  water:{tint:'blue',svg:'<svg width="44" height="44" viewBox="0 0 44 44" fill="none"><path d="M22 13.4c4.7 5.7 7.1 9.2 7.1 12.6a7.1 7.1 0 11-14.2 0c0-3.4 2.4-6.9 7.1-12.6z" fill="#0091FF"/><path d="M19 24.6a3.6 3.6 0 003.6 3.8" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg>'},
+  bookmark:{tint:'amber',svg:'<svg width="44" height="44" viewBox="0 0 44 44" fill="none"><path d="M17.4 13.6h9.2a2.2 2.2 0 012.2 2.2v15.6L22 26.6l-6.8 4.8V15.8a2.2 2.2 0 012.2-2.2z" fill="#F2A918"/></svg>'},
+  lotus:{tint:'green',svg:'<svg width="44" height="44" viewBox="0 0 44 44" fill="none"><path d="M22 29.6c-3.4 0-6.4-1.5-8.6-3.6 1.3-2.6 4.6-4 8.6-4s7.3 1.4 8.6 4c-2.2 2.1-5.2 3.6-8.6 3.6z" fill="#31A24C"/><path d="M22 15.2c2.5 2.4 3.8 5 3.8 7.4 0 1.6-.6 2.9-1.6 3.7-1.1-1-2.4-2.4-2.4-4.6 0-2.3-.9-4.5-.9-4.5s.5-1.2 1.1-2z" fill="#31A24C"/><path d="M18.4 22.4c0 2.2-1 3.7-2 4.7-1.1-.8-1.8-2.1-1.8-3.7 0-2.4 1.4-4.9 3.4-7.2.4 2 .4 4 .4 6.2z" fill="#31A24C" fill-opacity="0.55"/><path d="M25.6 22.4c0 2.2 1 3.7 2 4.7 1.1-.8 1.8-2.1 1.8-3.7 0-2.4-1.4-4.9-3.4-7.2-.4 2-.4 4-.4 6.2z" fill="#31A24C" fill-opacity="0.55"/></svg>'},
+  moon:{tint:'blue',svg:'<svg width="44" height="44" viewBox="0 0 44 44" fill="none"><path d="M27.4 29.2a9.4 9.4 0 01-11.6-12.4 9.6 9.6 0 1011.6 12.4z" fill="#0064E0"/><circle cx="28.6" cy="16.4" r="1.5" fill="#0064E0" fill-opacity="0.5"/><circle cx="31.6" cy="20.4" r="1.1" fill="#0064E0" fill-opacity="0.4"/></svg>'},
+  write:{tint:'amber',svg:'<svg width="44" height="44" viewBox="0 0 44 44" fill="none"><path d="M28.4 14.6l1.6 1.6-10.6 10.6-2.6 1 1-2.6 10.6-10.6z" fill="#F2A918"/><path d="M14.6 30.4h14.8" stroke="#F2A918" stroke-width="2.2" stroke-linecap="round"/></svg>'},
+  stretch:{tint:'green',svg:'<svg width="44" height="44" viewBox="0 0 44 44" fill="none"><circle cx="22" cy="14.4" r="3" stroke="#31A24C" stroke-width="2.2"/><path d="M22 18.6v9M22 21.4l-5.4-2.4M22 21.4l5.4-2.4M22 27.6l-4 6M22 27.6l4 6" stroke="#31A24C" stroke-width="2.2" stroke-linecap="round"/></svg>'},
+  star:{tint:'amber',svg:'<svg width="44" height="44" viewBox="0 0 44 44" fill="none"><path d="M22 13.6l2.7 5.5 6 .9-4.3 4.2 1 6-5.4-2.8-5.4 2.8 1-6-4.3-4.2 6-.9 2.7-5.5z" fill="#F2A918"/></svg>'}
+};
+const TINTS = {blue:'var(--soft-blue)',green:'var(--soft-green)',amber:'var(--soft-amber)'};
+
+const TAB_ICONS = {
+  today:{on:'#FFFFFF',off:'#8595A4',svg:function(c){return '<svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="6.4" stroke="'+c+'" stroke-width="1.8"/><path d="M6.2 9.3l1.9 1.9 3.7-3.9" stroke="'+c+'" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';}},
+  calendar:{on:'#FFFFFF',off:'#8595A4',svg:function(c){return '<svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="2.6" y="4.2" width="12.8" height="11.2" rx="3" stroke="'+c+'" stroke-width="1.8"/><path d="M2.6 7.8h12.8M6.6 2.6v3.2M11.4 2.6v3.2" stroke="'+c+'" stroke-width="1.8" stroke-linecap="round"/></svg>';}},
+  stats:{on:'#FFFFFF',off:'#8595A4',svg:function(c){return '<svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M4.2 14.4V9.8M9 14.4V4.6M13.8 14.4V7.6" stroke="'+c+'" stroke-width="2.2" stroke-linecap="round"/></svg>';}},
+  mine:{on:'#FFFFFF',off:'#8595A4',svg:function(c){return '<svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="6.6" r="3.2" stroke="'+c+'" stroke-width="1.8"/><path d="M3.6 15.2c.8-2.8 3-4.3 5.4-4.3s4.6 1.5 5.4 4.3" stroke="'+c+'" stroke-width="1.8" stroke-linecap="round"/></svg>';}}
+};
+
+const BADGE_ICONS = {
+  sun:{bg:'var(--soft-blue)',svg:'<svg width="60" height="60" viewBox="0 0 60 60" fill="none"><circle cx="30" cy="30" r="7.4" fill="#0064E0"/><path d="M30 14.6v5M30 40.4v5M14.6 30h5M40.4 30h5M19.4 19.4l3.6 3.6M37 37l3.6 3.6M40.6 19.4L37 23M23 37l-3.6 3.6" stroke="#0064E0" stroke-width="2.6" stroke-linecap="round"/></svg>'},
+  medal:{bg:'var(--soft-green)',svg:'<svg width="60" height="60" viewBox="0 0 60 60" fill="none"><circle cx="30" cy="26" r="8.4" stroke="#31A24C" stroke-width="2.8"/><path d="M25.4 33.2L22.6 44l7.4-4.2 7.4 4.2-2.8-10.8" stroke="#31A24C" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'},
+  star:{bg:'var(--soft-amber)',svg:'<svg width="60" height="60" viewBox="0 0 60 60" fill="none"><path d="M30 15.6l4.4 9 9.8 1.4-7.1 6.9 1.7 9.8L30 38.2l-8.8 4.5 1.7-9.8-7.1-6.9 9.8-1.4 4.4-9z" fill="#F2A918"/></svg>'},
+  lock:{bg:'var(--soft)',svg:'<svg width="60" height="60" viewBox="0 0 60 60" fill="none"><rect x="21" y="28" width="18" height="13.4" rx="4" stroke="#8595A4" stroke-width="2.6"/><path d="M25.4 28v-4.4a4.6 4.6 0 019.2 0V28" stroke="#8595A4" stroke-width="2.6" stroke-linecap="round"/></svg>'},
+  bolt:{bg:'var(--soft-amber)',svg:'<svg width="60" height="60" viewBox="0 0 60 60" fill="none"><path d="M32.4 14.6L19.4 33h8.6l-1.4 12.4L39.6 27h-8.6l1.4-12.4z" fill="#F2A918"/></svg>'},
+  heart:{bg:'var(--soft-blue)',svg:'<svg width="60" height="60" viewBox="0 0 60 60" fill="none"><path d="M30 44.4S15.6 35.6 15.6 26.6A8.6 8.6 0 0130 21.2a8.6 8.6 0 0114.4 5.4c0 9-14.4 17.8-14.4 17.8z" fill="#0064E0"/></svg>'}
+};
+
+const CHECK_SVG = '<svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M8.6 14.6l3.8 3.8 7.2-8" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const CHEVRON_16 = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="#8595A4" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const CHEVRON_12 = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 4.8L6 7.8l3-3" stroke="#444950" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const FLAME = '<svg width="12" height="14" viewBox="0 0 12 14" fill="none"><path d="M6 .8s4.2 3.4 4.2 7.6A4.2 4.2 0 011.8 8.4c0-2.4 1.5-3.8 2.3-5.1.4 1.3 1.1 2 1.7 2.2.4-1.9.2-3.7.2-4.7z" fill="#0A1317"/></svg>';
+const CLOCK_20 = '<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.4" stroke="#0064E0" stroke-width="1.8"/><path d="M10 5.8V10l2.8 1.8" stroke="#0064E0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const PLUS_40 = '<svg width="40" height="40" viewBox="0 0 40 40" fill="none"><path d="M20 13.5v13M13.5 20h13" stroke="#0A1317" stroke-width="2.2" stroke-linecap="round"/></svg>';
+const SHARE_40 = '<svg width="40" height="40" viewBox="0 0 40 40" fill="none"><path d="M20 25.5V13.5M20 13.5l-4.4 4.4M20 13.5l4.4 4.4" stroke="#0A1317" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M13.5 20.5h-.2A3.3 3.3 0 0010 23.8v4.9A3.3 3.3 0 0013.3 32h13.4A3.3 3.3 0 0030 28.7v-4.9a3.3 3.3 0 00-3.3-3.3h-.2" stroke="#0A1317" stroke-width="2.2" stroke-linecap="round"/></svg>';
+const MORE_40 = '<svg width="40" height="40" viewBox="0 0 40 40" fill="none"><circle cx="20" cy="12.6" r="2.2" fill="#0A1317"/><circle cx="20" cy="20" r="2.2" fill="#0A1317"/><circle cx="20" cy="27.4" r="2.2" fill="#0A1317"/></svg>';
+const AVATAR_56 = '<svg width="56" height="56" viewBox="0 0 56 56" fill="none"><circle cx="28" cy="22" r="7.6" stroke="#FFFFFF" stroke-width="2.6"/><path d="M15.4 43.6c1.7-6.8 6.6-10.6 12.6-10.6s10.9 3.8 12.6 10.6" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round"/></svg>';
+const ICON_OPT = {
+  book:'<svg width="56" height="56" viewBox="0 0 56 56" fill="none"><path d="M27 25.4c-2.7-2.2-6.5-3-10-3v13.6c3.5 0 7.3.8 10 3V25.4z" fill="#0064E0"/><path d="M29 25.4c2.7-2.2 6.5-3 10-3v13.6c-3.5 0-7.3.8-10 3V25.4z" fill="#0064E0" fill-opacity="0.42"/></svg>',
+  gym:'<svg width="56" height="56" viewBox="0 0 56 56" fill="none"><path d="M17.5 23.5v9M22.5 20.5v15M33.5 20.5v15M38.5 23.5v9M22.5 28h11" stroke="#31A24C" stroke-width="2.8" stroke-linecap="round"/></svg>',
+  water:'<svg width="56" height="56" viewBox="0 0 56 56" fill="none"><path d="M28 16.5c5.6 6.8 8.5 11 8.5 15a8.5 8.5 0 11-17 0c0-4 2.9-8.2 8.5-15z" fill="#0091FF"/></svg>',
+  bookmark:'<svg width="56" height="56" viewBox="0 0 56 56" fill="none"><path d="M22.5 16.5h11a2.5 2.5 0 012.5 2.5v19l-8-5.6-8 5.6V19a2.5 2.5 0 012.5-2.5z" fill="#F2A918"/></svg>'
+};
+const MINUS_28 = '<svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M10 14h8" stroke="#444950" stroke-width="2" stroke-linecap="round"/></svg>';
+const PLUS_28 = '<svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M14 10v8M10 14h8" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"/></svg>';
+
+/* ============================================================
+   2. 数据模型
+   ============================================================ */
+const WEEK_CN = ['日','一','二','三','四','五','六'];
+const ICON_KEYS = ['book','gym','water','bookmark'];
+
+const state = {
+  tab:'today',
+  view:'tab',
+  habits:[
+    {id:'h1', name:'早起阅读',     icon:'book',     freq:'每天',   detail:'30 分钟', streak:12, monthDays:17, done:true },
+    {id:'h2', name:'晨间运动',     icon:'gym',      freq:'每天',   detail:'40 分钟', streak:12, monthDays:16, done:true },
+    {id:'h3', name:'喝水 8 杯',    icon:'water',    freq:'每天',   detail:'目标 2 升', streak:12, monthDays:14, done:false, steps:{done:5,total:8,unit:'杯'} },
+    {id:'h4', name:'背单词 50 个', icon:'bookmark', freq:'工作日', detail:'50 个',   streak:9,  monthDays:12, done:false },
+    {id:'h5', name:'冥想 10 分钟', icon:'lotus',    freq:'每天',   detail:'10 分钟', streak:8,  monthDays:11, done:true },
+    {id:'h6', name:'早睡打卡',     icon:'moon',     freq:'每天',   detail:'23:00 前', streak:7, monthDays:10, done:true },
+    {id:'h7', name:'写日记',       icon:'write',    freq:'每天',   detail:'100 字',  streak:6,  monthDays:9,  done:true },
+    {id:'h8', name:'拉伸放松',     icon:'stretch',  freq:'每天',   detail:'8 分钟',  streak:4,  monthDays:6,  done:false }
+  ],
+  weeklyTrend:[62,88,56,100,75,85,44],   // 近 30 天各星期完成度（样例统计值）
+  profile:{joinedDays:46, totalCheckins:138, badges:6, maxStreak:12},
+  badges:[
+    {icon:'sun',   name:'早起鸟',  got:true },
+    {icon:'medal', name:'全勤月',  got:true },
+    {icon:'star',  name:'百次打卡',got:true },
+    {icon:'lock',  name:'待解锁',  got:false},
+    {icon:'bolt',  name:'连击达人',got:true },
+    {icon:'heart', name:'自律之心',got:true }
+  ],
+  form:{name:'', iconIdx:0, freq:'每天', remind:'21:30', target:30},
+  calMonth:null,
+  dirty:{calendar:true,stats:true,mine:true}
+};
+
+/* 历史打卡：本月每天完成的习惯数（1..18），4 日 / 7 日 漏卡 */
+const history = {};
+(function seedHistory(){
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
+  const missed = new Set([4,7]);
+  for (let day = 1; day < d; day++) {
+    const date = new Date(y, m, day);
+    const total = state.habits.length;
+    history[key(date)] = missed.has(day) ? {done:2,total} : {done:total,total};
+  }
+})();
+function key(dt){ return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0'); }
+
+function todayRecord(){
+  const total = state.habits.length;
+  const done = state.habits.filter(h=>h.done).length;
+  history[key(new Date())] = {done,total};
+  return {done,total};
+}
+/* 达标口径：当天完成全部习惯记为打卡日；今天只要已开始打卡即计入 */
+function isCheckinDay(k, r){
+  if (!r) return false;
+  return k === key(new Date()) ? r.done > 0 : r.done >= r.total;
+}
+function monthStats(){
+  const now = new Date();
+  const prefix = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-';
+  const keys = Object.keys(history).filter(k=>k.startsWith(prefix));
+  const hit = keys.filter(k=>isCheckinDay(k, history[k])).length;
+  return { checkinDays: hit, rate: keys.length ? hit/keys.length : 0 };
+}
+function elapsedDays(){ return new Date().getDate(); }
+function fmtDate(dt){ return (dt.getMonth()+1)+'月'+dt.getDate()+'日'; }
+function pct(v){ return Math.floor(v*100+1e-6); }
+
+/* ============================================================
+   3. 渲染
+   ============================================================ */
+const $ = (s,r)=> (r||document).querySelector(s);
+const contentEl = $('#content');
+const newContentEl = $('#newContent');
+
+function descOf(h){
+  let tail;
+  if (h.done) tail = '已坚持 '+h.streak+' 天';
+  else if (h.steps && h.steps.done > 0) tail = '还差 '+(h.steps.total-h.steps.done)+h.steps.unit;
+  else tail = '待打卡';
+  return h.freq+' · '+h.detail+' · '+tail;
+}
+
+/* ---------- 页头组件 ---------- */
+function pageHead(title, sub, actionHTML){
+  return '<div class="pagehead"><div class="titles"><div class="h1">'+title+'</div><div class="sub">'+sub+'</div></div>'+(actionHTML||'')+'</div>';
+}
+function secHead(title, link){
+  return '<div class="sec-head"><div class="sec-title">'+title+'</div>'+(link?'<button class="linkbtn">'+link+'</button>':'')+'</div>';
+}
+function habitRow(h){
+  const ic = HABIT_ICONS[h.icon] || HABIT_ICONS.book;
+  return '<div class="habit" data-habit="'+h.id+'">'+
+    '<div class="hicon" style="background:'+TINTS[ic.tint]+'">'+ic.svg+'</div>'+
+    '<div class="hmeta"><div class="hname">'+h.name+'</div><div class="hdesc">'+descOf(h)+'</div></div>'+
+    '<button class="check'+(h.done?' on':'')+'" data-check="'+h.id+'" aria-label="打卡">'+CHECK_SVG+'</button>'+
+  '</div>';
+}
+
+/* ---------- 01 今日 ---------- */
+function renderToday(){
+  const total = state.habits.length;
+  const done = state.habits.filter(h=>h.done).length;
+  const rate = done/total;
+  const rec = todayRecord();
+  const now = new Date();
+  const rows = state.habits.map(habitRow).join('');
+  return pageHead('今日', fmtDate(now)+' 星期'+WEEK_CN[now.getDay()], '<button class="iconbtn" id="goNew">'+PLUS_40+'</button>')
+  + '<div class="hero">'
+  +   '<div class="hero-top"><div class="hero-label">今日完成度</div>'
+  +     '<div class="streak">'+FLAME+'<span>连续 '+state.profile.maxStreak+' 天</span></div></div>'
+  +   '<div class="hero-num"><div class="big" id="heroDone">'+done+'</div><div class="of">/ '+total+' 项</div></div>'
+  +   '<div class="track"><div class="fill" id="heroFill" style="width:'+(rate*100)+'%"></div></div>'
+  +   '<div class="hero-foot"><div class="hint" id="heroHint">还差 '+(total-done)+' 项完成今日目标</div><div class="pct" id="heroPct">'+pct(rate)+'%</div></div>'
+  + '</div>'
+  + '<div class="section" id="habitSection">'+secHead('今日习惯','查看全部')
+  +   '<div class="list" id="habitList">'+rows+'</div></div>';
+}
+
+/* ---------- 02 日历 ---------- */
+function renderCalendar(){
+  const now = new Date();
+  const y = state.calMonth ? state.calMonth.y : now.getFullYear();
+  const m = state.calMonth ? state.calMonth.m : now.getMonth();
+  const first = new Date(y, m, 1);
+  const lead = (first.getDay()+6)%7;                    // 周一为首列
+  const daysInMonth = new Date(y, m+1, 0).getDate();
+  const prevDays = new Date(y, m, 0).getDate();
+  const cells = [];
+  for (let i=lead-1;i>=0;i--) cells.push({n:prevDays-i, other:true});
+  for (let d=1;d<=daysInMonth;d++) cells.push({n:d, other:false, date:new Date(y,m,d)});
+  const rows = Math.max(5, Math.ceil((lead+daysInMonth)/7));
+  const totalCells = rows*7;
+  while (cells.length < totalCells) cells.push({n:cells.length-(lead+daysInMonth)+1, other:true});
+
+  const todayK = key(now);
+  const grid = cells.map(c=>{
+    if (c.other) return '<div class="day other">'+c.n+'</div>';
+    const k = key(c.date);
+    const r = history[k];
+    let cls = 'day ';
+    if (k === todayK) cls += 'today';
+    else if (r && r.done >= r.total) cls += 'done';
+    else if (r) cls += 'miss';
+    else if (c.date > now) cls += 'other';
+    else cls += 'miss';
+    return '<div class="'+cls.trim()+'" data-day="'+k+'">'+c.n+'</div>';
+  }).join('');
+
+  const week = ['一','二','三','四','五','六','日'].map(w=>'<span>'+w+'</span>').join('');
+  const ms = monthStats();
+  const recs = recentRecords(7);
+
+  return pageHead('打卡日历', '本月 '+ms.checkinDays+' 天 · 完成率 '+pct(ms.rate)+'%', '<button class="iconbtn" id="shareCal">'+SHARE_40+'</button>')
+  + '<div class="calcard">'
+  +   '<div class="calhead"><div class="month">'+y+'年'+(m+1)+'月</div><button class="chip-sm" id="backToday">回到今天</button></div>'
+  +   '<div class="weekrow">'+week+'</div>'
+  +   '<div class="calgrid" id="calDays">'+grid+'</div>'
+  + '</div>'
+  + '<div class="section">'+secHead('最近打卡','全部记录')
+  +   '<div class="list" id="recList">'+recs+'</div></div>';
+}
+function recentRecords(n){
+  const out = [];
+  const now = new Date();
+  const todayK = key(now);
+  for (let i=0;i<n;i++){
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate()-i);
+    const k = key(d);
+    const r = history[k];
+    if (!r) continue;
+    const full = r.done >= r.total;
+    const label = i===0 ? '今天 · '+fmtDate(d) : (i===1 ? '昨天 · '+fmtDate(d) : fmtDate(d)+' 星期'+WEEK_CN[d.getDay()]);
+    const sub = '已完成 '+r.done+' / '+r.total+' 项 · '+(full?'全部完成':'保持这个节奏');
+    const lit = full || (i===0 && r.done>0);
+    out.push('<div class="habit" style="cursor:default">'+
+      '<div class="hmeta"><div class="hname">'+label+'</div><div class="hdesc">'+sub+'</div></div>'+
+      '<div class="check'+(lit?' on':'')+'" style="pointer-events:none">'+CHECK_SVG+'</div></div>');
+  }
+  return out.join('');
+}
+
+/* ---------- 03 统计 ---------- */
+function renderStats(){
+  const now = new Date();
+  const ms = monthStats();
+  const y = now.getFullYear(), m = now.getMonth()+1;
+  const bars = state.weeklyTrend.map((v,i)=>'<div class="bar'+(v===Math.max.apply(null,state.weeklyTrend)?' peak':'')+'" style="height:'+v+'%"></div>').join('');
+  const labels = ['一','二','三','四','五','六','日'].map(w=>'<span>'+w+'</span>').join('');
+  const elapsed = elapsedDays();
+  const top = state.habits.slice().sort((a,b)=>b.monthDays-a.monthDays).slice(0,3);
+  const ranks = top.map((h,i)=>'<div class="rank">'+
+      '<div class="no">'+(i+1)+'</div>'+
+      '<div class="rmain"><div class="rname">'+h.name+'</div>'+
+      '<div class="rtrack"><i style="width:'+Math.min(100, h.monthDays/elapsed*100)+'%"></i></div></div>'+
+      '<div class="days">'+h.monthDays+' 天</div></div>').join('');
+  return pageHead('数据统计',(now.getMonth()+1)+'月1日 - '+fmtDate(now), '<button class="chip" id="periodChip"><span>本月</span>'+CHEVRON_12+'</button>')
+  + '<div class="hero">'
+  +   '<div class="hero-top"><div class="hero-label">近 30 天完成率</div><div class="pct" style="color:#31A24C">较上周 +6%</div></div>'
+  +   '<div class="hero-num"><div class="big">'+pct(ms.rate)+'</div><div class="of" style="font-size:22px;line-height:28px">%</div></div>'
+  +   '<div class="chart"><div class="chart-bars">'+bars+'</div><div class="chart-labels">'+labels+'</div></div>'
+  + '</div>'
+  + '<div class="section">'+secHead('本月坚持榜','全部习惯')
+  +   '<div class="list gap10">'+ranks+'</div></div>';
+}
+
+/* ---------- 05 我的 ---------- */
+function renderMine(){
+  const p = state.profile;
+  const badges = state.badges.slice(0,4).map(b=>'<div class="badge'+(b.got?'':' locked')+'">'+
+    '<div class="ring" style="background:'+BADGE_ICONS[b.icon].bg+'">'+BADGE_ICONS[b.icon].svg+'</div>'+
+    '<div class="bl">'+b.name+'</div></div>').join('');
+  return pageHead('我的','已加入 '+p.joinedDays+' 天','<button class="iconbtn" id="moreBtn">'+MORE_40+'</button>')
+  + '<div class="ucard">'
+  +   '<div class="urow"><div class="avatar">'+AVATAR_56+'</div>'
+  +     '<div class="umeta"><div class="uname">ts</div><div class="usub">'+state.habits.length+' 个习惯 · 最长连续 '+p.maxStreak+' 天</div></div></div>'
+  +   '<div class="ustats">'
+  +     '<div class="ustat"><div class="n">'+p.totalCheckins+'</div><div class="l">累计打卡</div></div>'
+  +     '<div class="ustat"><div class="n">'+state.habits.length+'</div><div class="l">习惯数</div></div>'
+  +     '<div class="ustat"><div class="n">'+p.badges+'</div><div class="l">徽章</div></div>'
+  +   '</div>'
+  + '</div>'
+  + '<div class="section">'+secHead('我的成就','全部 '+p.badges+' 枚')
+  +   '<div class="badges">'+badges+'</div></div>'
+  + '<div class="section">'+secHead('设置')
+  +   '<div class="setcard">'
+  +     '<div class="setrow"><div class="sn">提醒通知</div>'+CHEVRON_16+'</div><div class="divider"></div>'
+  +     '<div class="setrow"><div class="sn">数据导出</div>'+CHEVRON_16+'</div><div class="divider"></div>'
+  +     '<div class="setrow"><div class="sn">关于我们</div>'+CHEVRON_16+'</div>'
+  +   '</div></div>';
+}
+
+/* ---------- 04 新建习惯 ---------- */
+function renderNew(){
+  const f = state.form;
+  const opts = ICON_KEYS.map((k,i)=>'<button class="iopts'+(f.iconIdx===i?' on':'')+'" data-icon="'+i+'">'+ICON_OPT[k]+'</button>').join('');
+  const freqs = ['每天','工作日','每周','自定义'].map(v=>'<button class="pill'+(f.freq===v?' on':'')+'" data-freq="'+v+'">'+v+'</button>').join('');
+  return pageHead('新建习惯','先设定一个能坚持的小目标','<button class="textbtn" id="cancelNew">取消</button>')
+  + '<div class="field"><div class="flabel">习惯名称</div>'
+  +   '<input class="input" id="habitName" placeholder="例如：早起阅读 30 分钟" value="'+f.name.replace(/"/g,'&quot;')+'"></div>'
+  + '<div class="field"><div class="flabel">选择图标</div><div class="iconrow">'+opts+'</div></div>'
+  + '<div class="field"><div class="flabel">重复频率</div><div class="pills">'+freqs+'</div></div>'
+  + '<div class="field"><div class="flabel">提醒时间</div>'
+  +   '<div class="rowcard"><div class="left">'+CLOCK_20+'<div class="val" id="remindVal">'+f.remind+'</div></div>'
+  +   '<button class="act" id="editRemind">修改</button></div>'
+  +   '<input type="time" id="remindPicker" class="hide" value="'+f.remind+'"></div>'
+  + '<div class="field"><div class="flabel">每日目标</div>'
+  +   '<div class="rowcard">'
+  +     '<button class="stepper" id="minusBtn"'+((f.target<=5)?' disabled':'')+'>'+MINUS_28+'</button>'
+  +     '<div class="val" id="targetVal">'+f.target+' 分钟</div>'
+  +     '<button class="stepper primary" id="plusBtn"'+((f.target>=180)?' disabled':'')+'>'+PLUS_28+'</button>'
+  +   '</div></div>';
+}
+
+/* ---------- Tab Bar ---------- */
+const TABS = [
+  {id:'today',   label:'今日'},
+  {id:'calendar',label:'日历'},
+  {id:'stats',   label:'统计'},
+  {id:'mine',    label:'我的'}
+];
+function renderTabbar(){
+  $('#tabpill').innerHTML = TABS.map(t=>{
+    const on = state.tab===t.id;
+    const ic = TAB_ICONS[t.id];
+    return '<button class="tab'+(on?' on':'')+'" data-tab="'+t.id+'">'+ic.svg(on?ic.on:ic.off)+'<span class="tlabel">'+t.label+'</span></button>';
+  }).join('');
+}
+
+const RENDERERS = {today:renderToday, calendar:renderCalendar, stats:renderStats, mine:renderMine};
+function renderTab(keepScroll){
+  const sc = keepScroll ? contentEl.scrollTop : 0;
+  contentEl.innerHTML = RENDERERS[state.tab]();
+  renderTabbar();
+  contentEl.scrollTop = sc;
+  state.dirty[state.tab] = false;
+}
+function switchTab(id){
+  if (state.tab===id && state.view==='tab') return;
+  state.tab = id;
+  state.view = 'tab';
+  $('#viewTab').classList.remove('hide');
+  $('#viewNew').classList.add('hide');
+  renderTab(false);
+  contentEl.scrollTop = 0;
+}
+function openNew(){
+  state.view = 'new';
+  $('#viewTab').classList.add('hide');
+  $('#viewNew').classList.remove('hide');
+  newContentEl.innerHTML = renderNew();
+  newContentEl.scrollTop = 0;
+}
+
+/* ============================================================
+   4. 交互
+   ============================================================ */
+function toggleHabit(id){
+  const h = state.habits.find(x=>x.id===id);
+  if (!h) return;
+  h.done = !h.done;
+  if (h.done){
+    if (h.steps) h.steps.done = h.steps.total;
+    h.streak += 1;
+    h.monthDays = Math.min(elapsedDays(), h.monthDays+1);
+    state.profile.totalCheckins += 1;
+  } else {
+    if (h.steps) h.steps.done = Math.max(1, h.steps.total-3);
+    h.streak = Math.max(0, h.streak-1);
+    h.monthDays = Math.max(0, h.monthDays-1);
+    state.profile.totalCheckins = Math.max(0, state.profile.totalCheckins-1);
+  }
+  // 局部更新今日页，保留滚动位置
+  const row = contentEl.querySelector('[data-habit="'+id+'"]');
+  if (row){
+    row.querySelector('.check').classList.toggle('on', h.done);
+    row.querySelector('.hdesc').textContent = descOf(h);
+  }
+  const total = state.habits.length;
+  const done = state.habits.filter(x=>x.done).length;
+  const rate = done/total;
+  const set = (sel,v)=>{ const el=document.getElementById(sel); if (el) el.textContent = v; };
+  set('heroDone', done);
+  set('heroHint', '还差 '+(total-done)+' 项完成今日目标');
+  set('heroPct', pct(rate)+'%');
+  const fill = document.getElementById('heroFill');
+  if (fill) fill.style.width = (rate*100)+'%';
+  todayRecord();
+  state.dirty.calendar = state.dirty.stats = state.dirty.mine = true;
+  const rec = contentEl.querySelector('#recList');
+  if (rec) rec.innerHTML = recentRecords(7);
+  toast(h.done ? '已完成「'+h.name+'」' : '已取消「'+h.name+'」');
+}
+
+/* ---------- 弹层 ---------- */
+const scrim = $('#scrim'), sheet = $('#sheet');
+function openSheet(title, bodyHTML){
+  $('#sheetTitle').textContent = title;
+  $('#sheetBody').innerHTML = bodyHTML;
+  scrim.classList.remove('hide'); sheet.classList.remove('hide');
+  requestAnimationFrame(()=>{ scrim.classList.add('show'); sheet.classList.add('show'); });
+}
+function closeSheet(){
+  scrim.classList.remove('show'); sheet.classList.remove('show');
+  setTimeout(()=>{ scrim.classList.add('hide'); sheet.classList.add('hide'); }, 330);
+}
+scrim.addEventListener('click', closeSheet);
+
+let toastTimer;
+function toast(msg){
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), 1800);
+}
+
+/* ---------- 事件委托 ---------- */
+contentEl.addEventListener('click', (e)=>{
+  const check = e.target.closest('[data-check]');
+  if (check && !check.closest('#recList')){ toggleHabit(check.getAttribute('data-check')); return; }
+  if (e.target.closest('#goNew')){ openNew(); return; }
+  if (e.target.closest('#backToday')){ state.calMonth = null; state.dirty.calendar = true; renderTab(false); toast('已回到本月'); return; }
+  if (e.target.closest('#shareCal')){
+    const ms = monthStats();
+    const text = '本月已打卡 '+ms.checkinDays+' 天，完成率 '+pct(ms.rate)+'%。';
+    copyText(text); toast('已复制：'+text); return;
+  }
+  if (e.target.closest('#periodChip')){ toast('当前统计周期：本月'); return; }
+  if (e.target.closest('#moreBtn')){ toast('设置项在下方'); contentEl.scrollTo({top:contentEl.scrollHeight,behavior:'smooth'}); return; }
+  if (e.target.closest('#tabpill')) return;
+  // 区块链接
+  const link = e.target.closest('.linkbtn');
+  if (link){
+    const label = link.textContent;
+    if (label==='查看全部'){ contentEl.scrollTo({top:contentEl.scrollHeight,behavior:'smooth'}); return; }
+    if (label==='全部习惯'){ switchTab('today'); toast('已切换到今日习惯列表'); return; }
+    if (label==='全部记录'){ openSheet('最近打卡记录', recentRecords(7)); return; }
+    if (label.indexOf('全部')===0){ openSheet('我的成就', badgeSheet()); return; }
+  }
+  if (e.target.closest('.setrow')){ toast('演示版：该设置项暂未接入'); return; }
+});
+function badgeSheet(){
+  return state.badges.map(b=>'<div class="srow">'+
+    '<div class="sl"><b>'+b.name+'</b><i>'+(b.got?'已解锁':'继续坚持即可解锁')+'</i></div>'+
+    '<div class="ring" style="width:44px;height:44px;border-radius:100px;background:'+BADGE_ICONS[b.icon].bg+';display:flex;align-items:center;justify-content:center;flex:none;transform:scale(.72)">'+BADGE_ICONS[b.icon].svg+'</div>'+
+  '</div>').join('');
+}
+function copyText(text){
+  try{
+    if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(text); return; }
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+  }catch(err){}
+}
+
+/* 日历：左右滑动切换月份 */
+let touchX = 0, touchY = 0;
+contentEl.addEventListener('touchstart', (e)=>{
+  const d = e.target.closest('.calgrid'); if (!d) return;
+  touchX = e.touches[0].clientX; touchY = e.touches[0].clientY;
+}, {passive:true});
+contentEl.addEventListener('touchend', (e)=>{
+  const d = e.target.closest('.calgrid'); if (!d) return;
+  const dx = e.changedTouches[0].clientX - touchX;
+  const dy = e.changedTouches[0].clientY - touchY;
+  if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy)) return;
+  const now = new Date();
+  const base = state.calMonth || {y:now.getFullYear(), m:now.getMonth()};
+  let m = base.m + (dx < 0 ? 1 : -1), y = base.y;
+  if (m > 11){ m = 0; y++; } if (m < 0){ m = 11; y--; }
+  state.calMonth = {y,m};
+  state.dirty.calendar = true;
+  renderTab(true);
+}, {passive:true});
+
+/* Tab 切换 */
+$('#tabpill').addEventListener('click', (e)=>{
+  const b = e.target.closest('[data-tab]');
+  if (!b) return;
+  const id = b.getAttribute('data-tab');
+  state.tab = id; state.view='tab';
+  if (state.dirty[id]) renderTab(false); else renderTabbar();
+});
+
+/* ---------- 新建习惯表单 ---------- */
+newContentEl.addEventListener('click', (e)=>{
+  const ic = e.target.closest('[data-icon]');
+  if (ic){ state.form.iconIdx = Number(ic.getAttribute('data-icon')); refreshNew(); return; }
+  const fq = e.target.closest('[data-freq]');
+  if (fq){ state.form.freq = fq.getAttribute('data-freq'); refreshNew(); return; }
+  if (e.target.closest('#editRemind')){ const p=$('#remindPicker'); if(p.showPicker) p.showPicker(); else p.click(); return; }
+  if (e.target.closest('#minusBtn')){ state.form.target = Math.max(5, state.form.target-5); refreshNew(); return; }
+  if (e.target.closest('#plusBtn')){ state.form.target = Math.min(180, state.form.target+5); refreshNew(); return; }
+  if (e.target.closest('#cancelNew')){ state.view='tab'; $('#viewNew').classList.add('hide'); $('#viewTab').classList.remove('hide'); return; }
+});
+newContentEl.addEventListener('input', (e)=>{
+  if (e.target.id==='habitName'){ state.form.name = e.target.value; }
+});
+newContentEl.addEventListener('change', (e)=>{
+  if (e.target.id==='remindPicker'){ state.form.remind = e.target.value; const v=$('#remindVal'); if(v) v.textContent = e.target.value; }
+});
+function refreshNew(){
+  const active = document.activeElement;
+  const focusId = active && active.id;
+  const sel = active && active.selectionStart;
+  const sc = newContentEl.scrollTop;
+  newContentEl.innerHTML = renderNew();
+  newContentEl.scrollTop = sc;
+  if (focusId){ const el = document.getElementById(focusId); if (el){ el.focus(); if (sel!=null && el.setSelectionRange) try{ el.setSelectionRange(sel,sel); }catch(err){} } }
+}
+$('#btnCreate').addEventListener('click', ()=>{
+  const f = state.form;
+  if (!f.name.trim()){ toast('先给习惯起个名字'); const i=$('#habitName'); if(i) i.focus(); return; }
+  const iconKey = ICON_KEYS[f.iconIdx] || 'book';
+  state.habits.push({
+    id:'h'+Date.now(), name:f.name.trim(), icon:iconKey, freq:f.freq,
+    detail:f.target+' 分钟', streak:0, monthDays:1, done:false
+  });
+  state.form = {name:'', iconIdx:0, freq:'每天', remind:'21:30', target:30};
+  newContentEl.innerHTML = renderNew();
+  switchTab('today');
+  contentEl.scrollTop = contentEl.scrollHeight;
+  toast('已创建「'+state.habits[state.habits.length-1].name+'」');
+});
+
+/* ============================================================
+   5. 自适应铺满
+   ============================================================ */
+const phone = $('#phone');
+function fit(){
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const s = Math.min(vw/390, vh/844);
+  phone.style.transform = 'scale('+s+')';
+  phone.style.height = (vh/s)+'px';
+}
+window.addEventListener('resize', fit);
+window.addEventListener('orientationchange', ()=>setTimeout(fit,120));
+
+/* ============================================================
+   6. 启动
+   ============================================================ */
+function tickClock(){
+  const d = new Date();
+  $('#clock').textContent = d.getHours()+':'+String(d.getMinutes()).padStart(2,'0');
+}
+tickClock();
+setInterval(tickClock, 20000);
+fit();
+todayRecord();                      // 保证今天始终有记录，任何页签进入都一致
+/* 支持 #t=today|calendar|stats|mine 与 #v=new，便于逐屏预览与截图核对 */
+(function applyHash(){
+  const q = new URLSearchParams(location.hash.replace(/^#/,''));
+  const t = q.get('t'), v = q.get('v');
+  if (t && RENDERERS[t]) state.tab = t;
+  if (v === 'new'){ state.view = 'new'; $('#viewTab').classList.add('hide'); $('#viewNew').classList.remove('hide'); newContentEl.innerHTML = renderNew(); return; }
+  renderTab(false);
+})();
+document.addEventListener('gesturestart', (e)=>e.preventDefault());
+</script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 圆环 -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="4.5"
+        android:pathData="M54,32 C66.15,32 76,41.85 76,54 C76,66.15 66.15,76 54,76 C41.85,76 32,66.15 32,54 C32,41.85 41.85,32 54,32 Z" />
+    <!-- 对勾 -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M44,55 L51,62 L65,46" />
+</vector>
